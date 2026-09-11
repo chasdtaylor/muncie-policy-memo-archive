@@ -45,20 +45,48 @@
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 2rem;
+            padding: 1.5rem 2rem;
             margin-bottom: 2rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
-        h2 {
-            margin-top: 0;
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .accordion-header h2 {
+            margin: 0;
             color: var(--primary);
-            border-bottom: 2px solid var(--border);
-            padding-bottom: 0.5rem;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        .toggle-icon {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: var(--secondary);
+            transition: transform 0.2s ease;
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .card.open .accordion-content {
+            max-height: 2000px; /* Generous height limit for smooth expansion */
+            transition: max-height 0.5s ease-in;
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1.5rem;
+        }
+        .card.open .toggle-icon {
+            transform: rotate(180deg);
         }
         .jurisdiction-selector {
             display: flex;
             gap: 1rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
         .tab-btn {
             background: var(--border);
@@ -119,30 +147,48 @@
     </header>
 
     <div class="container">
-        <div class="card">
-            <h2>Public Meeting Archives</h2>
-            <p>Access structured AI-assisted summaries and official records of local government proceedings. Select a jurisdiction below to browse available reports.</p>
-            
-            <div class="jurisdiction-selector">
-                <button class="tab-btn active" onclick="switchTarget('muncie_city', this)">City of Muncie</button>
-                <button class="tab-btn" onclick="switchTarget('delaware_county', this)">Delaware County</button>
+        <!-- Public Meeting Archives Card (Collapsible) -->
+        <div class="card" id="meetings-card">
+            <div class="accordion-header" onclick="toggleAccordion()">
+                <div>
+                    <h2>Public Meeting Archives</h2>
+                    <p style="margin: 0.25rem 0 0 0; color: var(--secondary); font-size: 0.95rem;">Access structured AI-assisted summaries and official records of local government proceedings.</p>
+                </div>
+                <span class="toggle-icon">&#9660;</span>
             </div>
+            
+            <div class="accordion-content">
+                <div class="jurisdiction-selector" style="margin-top: 1rem;">
+                    <button class="tab-btn active" onclick="switchTarget('muncie_city', event)">City of Muncie</button>
+                    <button class="tab-btn" onclick="switchTarget('delaware_county', event)">Delaware County</button>
+                </div>
 
-            <div style="overflow-x: auto;">
-                <table id="meetings-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Meeting Title</th>
-                            <th>Download Report</th>
-                        </tr>
-                    </thead>
-                    <tbody id="meetings-tbody">
-                        <tr>
-                            <td colspan="3" style="text-align: center; color: var(--secondary);">Loading meeting records...</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table id="meetings-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Meeting Title</th>
+                                <th>Download Report</th>
+                            </tr>
+                        </thead>
+                        <tbody id="meetings-tbody">
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--secondary);">Loading meeting records...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Placeholder for Future Project Cards (e.g., Finance, Newsletters) -->
+        <div class="card">
+            <div class="accordion-header" style="cursor: default;">
+                <div>
+                    <h2>Municipal Finance & Datasets</h2>
+                    <p style="margin: 0.25rem 0 0 0; color: var(--secondary); font-size: 0.95rem;">Budget analysis tools, expenditure tracking, and replication materials. (Coming Soon)</p>
+                </div>
             </div>
         </div>
     </div>
@@ -153,6 +199,18 @@
 
     <script>
         let currentTarget = 'muncie_city';
+        let dataLoaded = false;
+
+        function toggleAccordion() {
+            const card = document.getElementById('meetings-card');
+            card.classList.toggle('open');
+            
+            // Lazy load meeting records the first time the user opens the accordion
+            if (card.classList.contains('open') && !dataLoaded) {
+                loadMeetings(currentTarget);
+                dataLoaded = true;
+            }
+        }
 
         async function loadMeetings(targetId) {
             currentTarget = targetId;
@@ -182,9 +240,10 @@
             }
         }
 
-        function switchTarget(targetId, btn) {
+        function switchTarget(targetId, event) {
+            event.stopPropagation(); // Prevent accordion from toggling when clicking tabs
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+            event.currentTarget.classList.add('active');
             loadMeetings(targetId);
         }
 
@@ -192,9 +251,6 @@
             const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
             return text.replace(/[&<>"']/g, m => map[m]);
         }
-
-        // Load default view on page load
-        loadMeetings('muncie_city');
     </script>
 </body>
 </html>
