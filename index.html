@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muncie Policy Memo | Public Archive</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --secondary: #475569;
+            --background: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 2.5rem 1rem;
+            text-align: center;
+        }
+        header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.25rem;
+        }
+        header p {
+            margin: 0;
+            color: #93c5fd;
+            font-size: 1.1rem;
+        }
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        h2 {
+            margin-top: 0;
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+        .jurisdiction-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .tab-btn {
+            background: var(--border);
+            border: none;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--secondary);
+        }
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background-color: #f1f5f9;
+            color: var(--secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        tr:hover {
+            background-color: #f8fafc;
+        }
+        a.pdf-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a.pdf-link:hover {
+            text-decoration: underline;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--secondary);
+            font-size: 0.85rem;
+            border-top: 1px solid var(--border);
+            margin-top: 4rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Muncie Policy Memo</h1>
+        <p>Public data, meeting summaries, and municipal transparency archives for East Central Indiana.</p>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>Public Meeting Archives</h2>
+            <p>Access structured AI-assisted summaries and official records of local government proceedings. Select a jurisdiction below to browse available reports.</p>
+            
+            <div class="jurisdiction-selector">
+                <button class="tab-btn active" onclick="switchTarget('muncie_city', this)">City of Muncie</button>
+                <button class="tab-btn" onclick="switchTarget('delaware_county', this)">Delaware County</button>
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table id="meetings-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Meeting Title</th>
+                            <th>Download Report</th>
+                        </tr>
+                    </thead>
+                    <tbody id="meetings-tbody">
+                        <tr>
+                            <td colspan="3" style="text-align: center; color: var(--secondary);">Loading meeting records...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Charles D. Taylor. Open access civic governance data.</p>
+    </footer>
+
+    <script>
+        let currentTarget = 'muncie_city';
+
+        async function loadMeetings(targetId) {
+            currentTarget = targetId;
+            const tbody = document.getElementById('meetings-tbody');
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">Loading records...</td></tr>`;
+
+            try {
+                const response = await fetch(`meetings/${targetId}/meetings_index.json`);
+                if (!response.ok) throw new Error('Manifest not found');
+                
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">No reports published yet for this jurisdiction.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = data.map(row => `
+                    <tr>
+                        <td>${row.published_at ? row.published_at.substring(0, 10) : 'N/A'}</td>
+                        <td>${escapeHtml(row.title)}</td>
+                        <td><a class="pdf-link" href="${row.pdf_url}" target="_blank">PDF Report</a></td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">Unable to load meeting records for this target.</td></tr>`;
+            }
+        }
+
+        function switchTarget(targetId, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadMeetings(targetId);
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Load default view on page load
+        loadMeetings('muncie_city');
+    </script>
+</body>
+</html>
