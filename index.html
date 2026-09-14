@@ -74,8 +74,9 @@
             transition: max-height 0.3s ease-out;
         }
         .card.open .accordion-content {
-            max-height: 2000px; /* Generous height limit for smooth expansion */
-            transition: max-height 0.5s ease-in;
+            max-height: none;
+            overflow: visible;
+            transition: none;
             margin-top: 1.5rem;
             border-top: 1px solid var(--border);
             padding-top: 1.5rem;
@@ -86,7 +87,7 @@
         .jurisdiction-selector {
             display: flex;
             gap: 1rem;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
         .tab-btn {
             background: var(--border);
@@ -101,10 +102,50 @@
             background: var(--primary);
             color: white;
         }
+        .year-section {
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .year-header {
+            background-color: #f1f5f9;
+            padding: 0.75rem 1rem;
+            font-weight: bold;
+            color: var(--primary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        .year-header:hover {
+            background-color: #e2e8f0;
+        }
+        .year-content {
+            padding: 0 1rem 1rem 1rem;
+            display: none;
+        }
+        .year-section.open .year-content {
+            display: block;
+        }
+        .month-group {
+            margin-top: 1rem;
+        }
+        .month-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--secondary);
+            margin: 1rem 0 0.5rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.25rem;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
+            margin-top: 0.5rem;
         }
         th, td {
             text-align: left;
@@ -112,9 +153,9 @@
             border-bottom: 1px solid var(--border);
         }
         th {
-            background-color: #f1f5f9;
+            background-color: #f8fafc;
             color: var(--secondary);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -158,31 +199,18 @@
             </div>
             
             <div class="accordion-content">
-                <div class="jurisdiction-selector" style="margin-top: 1rem;">
+                <div class="jurisdiction-selector">
                     <button class="tab-btn active" onclick="switchTarget('muncie_city', event)">City of Muncie</button>
                     <button class="tab-btn" onclick="switchTarget('delaware_county', event)">Delaware County</button>
                 </div>
 
-                <div style="overflow-x: auto;">
-                    <table id="meetings-table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Meeting Title</th>
-                                <th>Download Report</th>
-                            </tr>
-                        </thead>
-                        <tbody id="meetings-tbody">
-                            <tr>
-                                <td colspan="3" style="text-align: center; color: var(--secondary);">Loading meeting records...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div id="meetings-container">
+                    <div style="text-align: center; color: var(--secondary); padding: 2rem;">Loading meeting records...</div>
                 </div>
             </div>
         </div>
 
-        <!-- Placeholder for Future Project Cards (e.g., Finance, Newsletters) -->
+        <!-- Placeholder for Future Project Cards -->
         <div class="card">
             <div class="accordion-header" style="cursor: default;">
                 <div>
@@ -205,7 +233,6 @@
             const card = document.getElementById('meetings-card');
             card.classList.toggle('open');
             
-            // Lazy load meeting records the first time the user opens the accordion
             if (card.classList.contains('open') && !dataLoaded) {
                 loadMeetings(currentTarget);
                 dataLoaded = true;
@@ -214,8 +241,8 @@
 
         async function loadMeetings(targetId) {
             currentTarget = targetId;
-            const tbody = document.getElementById('meetings-tbody');
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">Loading records...</td></tr>`;
+            const container = document.getElementById('meetings-container');
+            container.innerHTML = `<div style="text-align: center; color: var(--secondary); padding: 2rem;">Loading records...</div>`;
 
             try {
                 const response = await fetch(`meetings/${targetId}/meetings_index.json`);
@@ -224,24 +251,96 @@
                 const data = await response.json();
                 
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">No reports published yet for this jurisdiction.</td></tr>`;
+                    container.innerHTML = `<div style="text-align: center; color: var(--secondary); padding: 2rem;">No reports published yet for this jurisdiction.</div>`;
                     return;
                 }
 
-                tbody.innerHTML = data.map(row => `
-                    <tr>
-                        <td>${row.published_at ? row.published_at.substring(0, 10) : 'N/A'}</td>
-                        <td>${escapeHtml(row.title)}</td>
-                        <td><a class="pdf-link" href="${row.pdf_url}" target="_blank">PDF Report</a></td>
-                    </tr>
-                `).join('');
+                // Group records by Year and Month
+                const grouped = {};
+                data.forEach(row => {
+                    if (!row.published_at) return;
+                    const year = row.published_at.substring(0, 4);
+                    const month = row.published_at.substring(5, 7);
+                    
+                    if (!grouped[year]) grouped[year] = {};
+                    if (!grouped[year][month]) grouped[year][month] = [];
+                    
+                    grouped[year][month].push(row);
+                });
+
+                const sortedYears = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+                
+                let html = '';
+                sortedYears.forEach((year, index) => {
+                    const months = grouped[year];
+                    const sortedMonths = Object.keys(months).sort((a, b) => b.localeCompare(a));
+                    // Default the most recent year open, others closed
+                    const isOpen = index === 0 ? 'open' : '';
+                    
+                    html += `
+                        <div class="year-section ${isOpen}">
+                            <div class="year-header" onclick="toggleYear(this)">
+                                <span>${year} Archive</span>
+                                <span class="toggle-icon">&#9660;</span>
+                            </div>
+                            <div class="year-content">
+                    `;
+
+                    sortedMonths.forEach(month => {
+                        const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });
+                        html += `
+                            <div class="month-group">
+                                <div class="month-title">${monthName} ${year}</div>
+                                <div style="overflow-x: auto;">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 15%;">Date</th>
+                                                <th>Meeting Title</th>
+                                                <th style="width: 20%;">Download</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                        `;
+
+                        months[month].forEach(row => {
+                            const dateStr = row.published_at ? row.published_at.substring(0, 10) : 'N/A';
+                            html += `
+                                <tr>
+                                    <td>${dateStr}</td>
+                                    <td>${escapeHtml(row.title)}</td>
+                                    <td><a class="pdf-link" href="${row.pdf_url}" target="_blank">PDF Report</a></td>
+                                </tr>
+                            `;
+                        });
+
+                        html += `
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
             } catch (error) {
-                tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--secondary);">Unable to load meeting records for this target.</td></tr>`;
+                container.innerHTML = `<div style="text-align: center; color: var(--secondary); padding: 2rem;">Unable to load meeting records for this target.</div>`;
             }
         }
 
+        function toggleYear(headerEl) {
+            const section = headerEl.parentElement;
+            section.classList.toggle('open');
+        }
+
         function switchTarget(targetId, event) {
-            event.stopPropagation(); // Prevent accordion from toggling when clicking tabs
+            event.stopPropagation();
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             event.currentTarget.classList.add('active');
             loadMeetings(targetId);
